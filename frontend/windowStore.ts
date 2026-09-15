@@ -48,6 +48,10 @@ export type WinState = {
   seq: number; // adoption order — tile slot order
   stack: number; // focus recency — higher = more recent (dock highlight, LRU)
   minimized: boolean;
+  /** last known `card.lane` (baseline: the lane at adopt/hydrate time) — the
+   * done-transition detector's memory (see syncLanes). Never used for
+   * anything but that comparison. */
+  lane: string;
 };
 
 export type Snapshot = {
@@ -189,7 +193,14 @@ export function adopt(card: Card, capacity: number = MAX_VISIBLE): void {
     emit();
     return;
   }
-  wins.push({ id: card.id, card, seq: ++seqCounter, stack: ++stackCounter, minimized: false });
+  wins.push({
+    id: card.id,
+    card,
+    seq: ++seqCounter,
+    stack: ++stackCounter,
+    minimized: false,
+    lane: card.lane,
+  });
   // sticky zoom mode: a card adopted while zoomed arrives MAXIMIZED (the
   // mode persists and the newcomer becomes its target); outside the mode the
   // newcomer just joins the tiles.
@@ -203,6 +214,38 @@ export function close(id: string): void {
   if (zoomedId === id) zoomedId = nextZoomTarget(id); // mode stays, target advances
   wins = wins.filter((w) => w.id !== id);
   emit(); // wins empty ⟹ the host unmounts the region and clears the inset
+}
+
+/** Auto-close-on-done (feature: a task reaching Done closes its own tile).
+ * The host feeds this the live board data on every card-data update; it
+ * compares each adopted card's CURRENT lane against the last one observed
+ * (WinState.lane, seeded at adopt()/hydrate() time) and closes only on an
+ * observed not-done→done TRANSITION — never continuously on "is done":
+ * - a card already "done" when manually opened is seeded done at adopt() ⟹
+ *   this never sees a transition for it, so it stays open (spec requirement).
+ * - a card temporarily absent from CARDS (snoozed/dismissed/feed hiccup) is
+ *   simply skipped — absence is not a close signal, and its last-known lane
+ *   is left untouched so a real transition is still caught once it reappears.
+ * - the very first observation of a card is never a transition: adopt()/
+ *   hydrate() always seed `lane` from that same card, so lane === live.lane
+ *   the first time this runs for it.
+ * Closing reuses close()'s zoom-fallback rule (nextZoomTarget) but batches
+ * every close from one call into a single emit(). */
+export function syncLanes(cards: readonly Card[]): void {
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  let closedAny = false;
+  for (const w of [...wins]) {
+    const live = byId.get(w.id);
+    if (!live) continue; // missing from the feed — not a signal
+    if (w.lane !== "done" && live.lane === "done") {
+      if (zoomedId === w.id) zoomedId = nextZoomTarget(w.id); // mode stays, target advances
+      wins = wins.filter((x) => x.id !== w.id);
+      closedAny = true;
+    } else {
+      w.lane = live.lane;
+    }
+  }
+  if (closedAny) emit();
 }
 
 function focusInternal(w: WinState, capacity: number): void {
@@ -326,6 +369,7 @@ export function hydrate(cards: Card[]): void {
       seq: ++seqCounter,
       stack: ++stackCounter,
       minimized: minimized.has(id),
+      lane: card.lane,
     });
   }
   if (wins.length === 0) return;

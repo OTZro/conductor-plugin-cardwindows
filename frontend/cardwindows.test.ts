@@ -51,8 +51,8 @@ function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
 }
 
-const card = (id: string): Card =>
-  ({ id, external_id: id.toUpperCase(), title: `card ${id}` }) as unknown as Card;
+const card = (id: string, lane: string = "ai_working"): Card =>
+  ({ id, external_id: id.toUpperCase(), title: `card ${id}`, lane }) as unknown as Card;
 
 // a 1512×884 workspace content area (viewport minus header minus dock)
 const W = 1512;
@@ -299,7 +299,7 @@ test("swapSlots: swaps exactly the two tiles' layout slots, others untouched", (
 
 test("swapSlots: the arrangement persists with the session (survives reload)", () => {
   store.resetStore();
-  const cards = ["a", "b", "c"].map(card);
+  const cards = ["a", "b", "c"].map((id) => card(id));
   for (const c of cards) store.adopt(c, 6);
   store.swapSlots("a", "c");
   store.resetStore({ keepSession: true }); // reload
@@ -351,7 +351,7 @@ test("zoom MODE: explicit un-toggle is the only exit; minimize/close advance the
 
 test("session: open list, minimized set, zoom and mode survive a reload (hydrate)", () => {
   store.resetStore();
-  const cards = ["a", "b", "c"].map(card);
+  const cards = ["a", "b", "c"].map((id) => card(id));
   for (const c of cards) store.adopt(c, 6);
   store.minimize("b");
   store.toggleZoom("c");
@@ -396,6 +396,60 @@ test("session: cards gone from the board are dropped silently; no geometry is pe
       "session blob carries no rects/geometry",
     );
   }
+});
+
+// ── store: close-on-done (auto-close on lane TRANSITION) ────────────────────
+
+test("syncLanes: a not-done→done transition closes the tile and dock chip", () => {
+  store.resetStore();
+  store.adopt(card("a", "ai_working"), 6);
+  store.adopt(card("b", "ai_working"), 6);
+  store.syncLanes([card("a", "done"), card("b", "ai_working")]);
+  assert(store.snapshot().wins.map((w) => w.id).join(",") === "b", "a's tile+chip closed, b untouched");
+});
+
+test("syncLanes: a card already done when manually opened stays open (not a transition)", () => {
+  store.resetStore();
+  store.adopt(card("a", "done"), 6); // baseline seeded done at adopt time
+  store.syncLanes([card("a", "done")]); // still done — no transition, ever
+  assert(store.snapshot().wins.map((w) => w.id).join(",") === "a", "manual open of an already-done card is never auto-closed");
+  store.syncLanes([card("a", "done")]);
+  assert(store.snapshot().wins.length === 1, "repeated observation of steady-state done stays a no-op");
+});
+
+test("syncLanes: a card missing from the feed is not a close signal", () => {
+  store.resetStore();
+  store.adopt(card("a", "ai_working"), 6);
+  store.syncLanes([]); // feed hiccup / snoozed — card absent entirely
+  assert(store.snapshot().wins.map((w) => w.id).join(",") === "a", "absence alone never closes");
+  store.syncLanes([card("a", "ai_working")]); // reappears, still not done
+  assert(store.snapshot().wins.length === 1, "reappearing not-done stays open");
+  store.syncLanes([card("a", "done")]); // reappears AND now done — real transition
+  assert(store.snapshot().wins.length === 0, "the transition is still caught once observed");
+});
+
+test("syncLanes: closing the zoomed/focused tile falls back to the next most-recent visible", () => {
+  store.resetStore();
+  for (const id of ["a", "b", "c"]) store.adopt(card(id, "ai_working"), 6);
+  store.toggleZoom("b");
+  assert(store.snapshot().zoomedId === "b", "b is the maximized tab");
+  store.syncLanes([card("a", "ai_working"), card("b", "done"), card("c", "ai_working")]);
+  assert(!store.snapshot().wins.some((w) => w.id === "b"), "b's tile+chip closed on the transition");
+  assert(store.snapshot().zoomedId === "c", "zoom mode falls back to the next most-recent visible (c)");
+});
+
+test("syncLanes: emits once per call even when multiple tiles transition together", () => {
+  store.resetStore();
+  for (const id of ["a", "b", "c"]) store.adopt(card(id, "ai_working"), 6);
+  let n = 0;
+  const un = store.subscribe(() => (n += 1));
+  store.syncLanes([card("a", "done"), card("b", "done"), card("c", "ai_working")]);
+  assert(n === 1, "batched into a single emit");
+  assert(store.snapshot().wins.map((w) => w.id).join(",") === "c", "both transitioned tiles closed");
+  const before = n;
+  store.syncLanes([card("c", "ai_working")]); // no transition at all
+  assert(n === before, "a no-op sync emits nothing");
+  un();
 });
 
 // ── summary ─────────────────────────────────────────────────────────────────

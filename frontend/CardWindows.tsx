@@ -105,6 +105,15 @@ export function CardWindowsOverlay({ cards, onOpenCard, onChanged, boardish }: O
     if (cards.length > 0) store.hydrate(cards);
   }, [cards]);
 
+  // close-on-done: feed the live board data's per-card lane to the store on
+  // every update so it can detect a not-done→done TRANSITION (see
+  // windowStore.syncLanes doc) and auto-close that tile + dock chip. Reading
+  // `cards` is exactly what makes this host — not the store — the place that
+  // observes lane changes; the store only remembers the last one it saw.
+  useEffect(() => {
+    store.syncLanes(cards);
+  }, [cards]);
+
   const present = wins.length > 0;
   const shown = present && boardish; // view-coexistence: hide off-board
   const width = shown ? regionWidth(viewportW, boardCollapsed, regionFrac) : 0;
