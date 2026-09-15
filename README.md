@@ -1,5 +1,8 @@
-# conductor-plugin-cardwindows
+# Card Windows
 
-浮動卡片視窗 plugin。無機器前置條件、無公司資訊（未來可考慮公開）。
+多開卡片的平鋪工作區。
 
-安裝／更新走 conductor Marketplace（git tag vX.Y.Z）。
+- 左側保留原本看板，右側平鋪工作區，可拖拉分隔線、收合看板全螢幕
+- 點卡片即納入平鋪;dock 籤條切換、置頂縮放記憶
+- 精簡卡片標頭，標題列展開完整表頭
+- 區塊聚焦(⤢):單一區塊撐滿卡片高度,terminal 獲得最大空間
