@@ -1,0 +1,8 @@
+{
+  "name": "cardwindows",
+  "version": "v0.1.0",
+  "description": "浮動卡片視窗:把固定的右側卡片抽屜換成可拖曳、可縮放、可多開的浮動視窗(內容仍是原本完整的卡片詳情)。支援 並排/四分割 自動排版、每視窗定位選單(左半/右半/四角/置中)、位置大小逐卡記憶、Esc 關閉聚焦視窗。前端註冊以 /api/plugins/manifest 為準:在管理面板停用後重啟 conductor 並重新整理頁面,固定抽屜即恢復,毋須重新 build;整個移除目錄則照舊需 rebuild。",
+  "author": "OTZro",
+  "backend": true,
+  "frontend": true
+}
