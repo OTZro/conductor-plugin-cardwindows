@@ -452,6 +452,47 @@ test("syncLanes: emits once per call even when multiple tiles transition togethe
   un();
 });
 
+// ── closeAll: the dock's 全部關閉 ───────────────────────────────────────────
+
+test("closeAll: empties the workspace in one emit", () => {
+  store.resetStore();
+  for (const id of ["a", "b", "c"]) store.adopt(card(id, "ai_working"), 6);
+  let n = 0;
+  const un = store.subscribe(() => (n += 1));
+  store.closeAll();
+  assert(store.snapshot().wins.length === 0, "every tile closed");
+  assert(n === 1, "one emit, not one per tile");
+  un();
+});
+
+test("closeAll: clears the zoom target instead of advancing it", () => {
+  store.resetStore();
+  for (const id of ["a", "b"]) store.adopt(card(id, "ai_working"), 6);
+  store.toggleZoom("a");
+  store.closeAll();
+  const snap = store.snapshot();
+  assert(snap.zoomedId === null, "no survivor to zoom into");
+  assert(snap.wins.length === 0, "and nothing left open");
+});
+
+test("closeAll: a no-op on an empty workspace emits nothing", () => {
+  store.resetStore();
+  let n = 0;
+  const un = store.subscribe(() => (n += 1));
+  store.closeAll();
+  assert(n === 0, "nothing to close, nothing to announce");
+  un();
+});
+
+test("closeAll: a closed card reopens from the board", () => {
+  store.resetStore();
+  store.adopt(card("a", "ai_working"), 6);
+  store.adopt(card("b", "ai_working"), 6);
+  store.closeAll();
+  store.adopt(card("a", "ai_working"), 6);
+  assert(store.snapshot().wins.map((w) => w.id).join(",") === "a", "reopens cleanly");
+});
+
 // ── summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

@@ -216,6 +216,20 @@ export function close(id: string): void {
   emit(); // wins empty ⟹ the host unmounts the region and clears the inset
 }
 
+/** Close every open tile at once — the dock's 全部關閉.
+ *
+ * No confirmation: closing tiles is cheap and undone by clicking the card on
+ * the board again, and each card's remembered geometry lives in the per-card
+ * persistence rather than in `wins`, so nothing is lost by closing.
+ * One emit, not N: closing them individually would walk the zoom target
+ * through tiles that are themselves about to go, and re-render per tile. */
+export function closeAll(): void {
+  if (!wins.length) return;
+  wins = [];
+  zoomedId = null; // nothing survives for nextZoomTarget to advance to
+  emit(); // wins empty ⟹ the host unmounts the region and clears the inset
+}
+
 /** Auto-close-on-done (feature: a task reaching Done closes its own tile).
  * The host feeds this the live board data on every card-data update; it
  * compares each adopted card's CURRENT lane against the last one observed

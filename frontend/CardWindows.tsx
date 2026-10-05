@@ -333,6 +333,23 @@ export function CardWindowsOverlay({ cards, onOpenCard, onChanged, boardish }: O
             );
           })}
         </div>
+        {/* 全部關閉 — the whole point of the dock is that tiles pile up, so the
+            one-by-one ✕ stops scaling exactly when you need it most. Shown only
+            from two tiles up: at one, the chip's own ✕ is right there and a
+            second control would just be a wider target for the same action.
+            Sits after the chip strip and before the layout buttons, so neither
+            a chip ✕ nor 並排/四分割 is its neighbour — the two things you reach
+            for most while tiles are open. */}
+        {wins.length > 1 && (
+          <button
+            onClick={() => store.closeAll()}
+            className="shrink-0 px-2 py-1 rounded text-[11px] border bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500"
+            title={`關閉全部 ${wins.length} 張(可再從看板點開)`}
+            aria-label={`Close all ${wins.length} cards`}
+          >
+            全部關閉
+          </button>
+        )}
         <div className="shrink-0 flex items-center gap-1">
           {(
             [
