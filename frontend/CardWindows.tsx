@@ -57,6 +57,34 @@ import { GAP, regionWidth, tileRects, visibleCapacity } from "./tiling";
 import type { WinState } from "./windowStore";
 import * as store from "./windowStore";
 
+/** Block-at-a-time scrolling inside a tile (user request: a scroll should land
+ * on a whole block, never leave one sliced by the tile's edge).
+ *
+ * Expressed as CSS over core's two inert seams — `data-card-scroll` (the card's
+ * single scroll body) and `data-card-block` (each unfocused FocusBlock) — rather
+ * than as props, because the scroller belongs to CardDetail and the host has no
+ * handle on it. Scoped under .cw-snap so ONLY tiles snap; the ordinary
+ * right-hand drawer keeps free scrolling.
+ *
+ * `mandatory` is safe even though a block can be taller than a tile: the CSS
+ * Scroll Snap spec lets a snap area larger than the snapport be scrolled
+ * through freely, so tall content stays reachable instead of being pinned at
+ * its top edge. `scroll-snap-stop: always` is the part that makes it one block
+ * per gesture — without it a fast wheel flings past several.
+ *
+ * A terminal needs no exclusion: xterm owns the wheel over its own viewport,
+ * so those ticks never reach this scroller to be snapped. */
+const SNAP_CSS = `
+.cw-snap [data-card-scroll] {
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+}
+.cw-snap [data-card-block] {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+`;
+
 /** Same measurement CardDetail itself does — the app header band height. */
 function useHeaderH(): number {
   const [h, setH] = useState(0);
@@ -239,6 +267,7 @@ export function CardWindowsOverlay({ cards, onOpenCard, onChanged, boardish }: O
       style={{ top: headerH, width: shown ? width : regionWidth(viewportW, boardCollapsed, regionFrac) }}
       aria-hidden={!shown}
     >
+      <style>{SNAP_CSS}</style>
       {!boardCollapsed && (
         /* board/workspace divider — drag to resize the split (min board 360px,
            min region = one column); double-click restores the 60% default */
@@ -518,7 +547,7 @@ function Tile({
           // the real viewport again, so its toolbar row (paste image, ⤡ exit)
           // is visible instead of being pushed into the tile's clipped -headerH
           // band. CSS-only flip — nothing reparents, the iframe never remounts.
-          className="absolute inset-x-0 bottom-0 [transform:translateZ(0)] has-[[data-term-maximized]]:[transform:none]"
+          className="cw-snap absolute inset-x-0 bottom-0 [transform:translateZ(0)] has-[[data-term-maximized]]:[transform:none]"
           style={{ top: -headerH }}
         >
           <BaseDetail
