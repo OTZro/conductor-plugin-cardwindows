@@ -49,6 +49,7 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { PluginBadges } from "../../../components/PluginBadges";
 import type { OverlaySurfaceProps } from "../../../kernel/seams";
 import { baseCardSurface } from "../../../kernel/seams";
 import type { Card } from "../../../types";
@@ -347,6 +348,11 @@ export function CardWindowsOverlay({ cards, onOpenCard, onChanged, boardish }: O
                 />
                 <span className="font-mono text-[10px] text-zinc-400">{c.external_id}</span>
                 <span className="max-w-[9rem] truncate">{truncate(c.title, 18)}</span>
+                {/* the board card's plugin badges (OffiCraft unread / 請示 / 待你處理,
+                    and whatever any other plugin writes) through core's shared
+                    renderer — no plugin-specific code here. Capped at 2 because the
+                    chip strip is one line; the rest fold into a +N that lists them. */}
+                <PluginBadges card={c} max={2} />
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
